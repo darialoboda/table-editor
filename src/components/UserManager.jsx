@@ -17,18 +17,40 @@ import {
   IconButton,
   Stack,
   Paper,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
 } from '@mui/material';
 
 import DeleteIcon from '@mui/icons-material/Delete';
+import EditIcon from '@mui/icons-material/Edit';
+import AddIcon from '@mui/icons-material/Add';
+
+import { useSnackbar } from 'notistack';
 
 const UserManager = () => {
   const { state, dispatch } = useAppState();
+  const { enqueueSnackbar } = useSnackbar();
+
+  const [openAddModal, setOpenAddModal] = useState(false);
+  const [openEditModal, setOpenEditModal] = useState(false);
+  const [openDeleteId, setOpenDeleteId] = useState(null);
+
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
 
+  const [editingUserId, setEditingUserId] = useState(null);
+
+  const handleOpenAdd = () => {
+    setName('');
+    setEmail('');
+    setOpenAddModal(true);
+  };
+
   const handleAddUser = () => {
     if (!name || !email) {
-      alert('Name and email are required.');
+      enqueueSnackbar('Name and email are required.', { variant: 'warning' });
       return;
     }
 
@@ -37,7 +59,7 @@ const UserManager = () => {
     );
 
     if (isDuplicate) {
-      alert('User with this name or email already exists.');
+      enqueueSnackbar('User with this name or email already exists.', { variant: 'error' });
       return;
     }
 
@@ -46,16 +68,48 @@ const UserManager = () => {
 
     setName('');
     setEmail('');
+    setOpenAddModal(false);
+    enqueueSnackbar('User added successfully.', { variant: 'success' });
   };
 
-  const handleDeleteUser = (id) => {
-    if (window.confirm('Are you sure you want to delete this user?')) {
-      dispatch({ type: 'DELETE_USER', payload: id });
+  const handleEditInit = (user) => {
+    setEditingUserId(user.id);
+    setName(user.name);
+    setEmail(user.email);
+    setOpenEditModal(true);
+  };
+
+  const handleEditSave = () => {
+    if (!name || !email) {
+      enqueueSnackbar('Both fields are required.', { variant: 'warning' });
+      return;
     }
+
+    dispatch({
+      type: 'UPDATE_USER',
+      payload: {
+        id: editingUserId,
+        name,
+        email,
+      },
+    });
+
+    setOpenEditModal(false);
+    setEditingUserId(null);
+    setName('');
+    setEmail('');
+    enqueueSnackbar('User updated.', { variant: 'info' });
+  };
+
+  const handleDeleteConfirm = () => {
+    dispatch({ type: 'DELETE_USER', payload: openDeleteId });
+    setOpenDeleteId(null);
+    enqueueSnackbar('User deleted.', { variant: 'info' });
   };
 
   const handleChangeActive = (e) => {
     dispatch({ type: 'SET_ACTIVE_USER', payload: e.target.value });
+    enqueueSnackbar('Active user changed.', { variant: 'default' });
   };
 
   return (
@@ -83,31 +137,14 @@ const UserManager = () => {
         </Select>
       </FormControl>
 
-      <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} sx={{ mb: 2 }}>
-        <TextField
-          label="Name"
-          variant="outlined"
-          value={name}
-          fullWidth
-          onChange={(e) => setName(e.target.value)}
-        />
-        <TextField
-          label="Email"
-          variant="outlined"
-          type="email"
-          value={email}
-          fullWidth
-          onChange={(e) => setEmail(e.target.value)}
-        />
-        <Button
-          variant="contained"
-          color="primary"
-          onClick={handleAddUser}
-          sx={{ minWidth: 150 }}
-        >
-          Add User
-        </Button>
-      </Stack>
+      <Button
+        variant="contained"
+        startIcon={<AddIcon />}
+        onClick={handleOpenAdd}
+        sx={{ mb: 2 }}
+      >
+        Add User
+      </Button>
 
       {state.users.length === 0 ? (
         <Typography>No users added yet.</Typography>
@@ -118,24 +155,96 @@ const UserManager = () => {
               <ListItem
                 key={user.id}
                 secondaryAction={
-                  <IconButton
-                    edge="end"
-                    aria-label="delete"
-                    onClick={() => handleDeleteUser(user.id)}
-                  >
-                    <DeleteIcon />
-                  </IconButton>
+                  <Stack direction="row" spacing={1}>
+                    <IconButton
+                      edge="end"
+                      aria-label="edit"
+                      onClick={() => handleEditInit(user)}
+                    >
+                      <EditIcon />
+                    </IconButton>
+                    <IconButton
+                      edge="end"
+                      aria-label="delete"
+                      onClick={() => setOpenDeleteId(user.id)}
+                    >
+                      <DeleteIcon />
+                    </IconButton>
+                  </Stack>
                 }
               >
-                <ListItemText
-                  primary={user.name}
-                  secondary={user.email}
-                />
+                <ListItemText primary={user.name} secondary={user.email} />
               </ListItem>
             ))}
           </List>
         </Paper>
       )}
+
+      {/* Add User Modal */}
+      <Dialog open={openAddModal} onClose={() => setOpenAddModal(false)} maxWidth="sm" fullWidth>
+        <DialogTitle>Add New User</DialogTitle>
+        <DialogContent>
+          <TextField
+            autoFocus
+            label="Name"
+            fullWidth
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            sx={{ mt: 2 }}
+          />
+          <TextField
+            label="Email"
+            fullWidth
+            type="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            sx={{ mt: 2 }}
+          />
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setOpenAddModal(false)}>Cancel</Button>
+          <Button onClick={handleAddUser} variant="contained">Add</Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Edit User Modal */}
+      <Dialog open={openEditModal} onClose={() => setOpenEditModal(false)} maxWidth="sm" fullWidth>
+        <DialogTitle>Edit User</DialogTitle>
+        <DialogContent>
+          <TextField
+            autoFocus
+            label="Name"
+            fullWidth
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            sx={{ mt: 2 }}
+          />
+          <TextField
+            label="Email"
+            fullWidth
+            type="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            sx={{ mt: 2 }}
+          />
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setOpenEditModal(false)}>Cancel</Button>
+          <Button onClick={handleEditSave} variant="contained">Save</Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Delete Confirmation Modal */}
+      <Dialog open={!!openDeleteId} onClose={() => setOpenDeleteId(null)}>
+        <DialogTitle>Confirm Delete</DialogTitle>
+        <DialogContent>
+          <Typography>Are you sure you want to delete this user?</Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setOpenDeleteId(null)}>Cancel</Button>
+          <Button onClick={handleDeleteConfirm} color="error" variant="contained">Delete</Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 };

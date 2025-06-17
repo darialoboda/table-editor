@@ -14,11 +14,18 @@ import {
   Paper,
   TableContainer,
   useTheme,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
 } from '@mui/material';
 
 const TableRows = ({ table }) => {
   const { state, dispatch } = useAppState();
   const [text, setText] = useState('');
+  const [editRow, setEditRow] = useState(null); // row object
+  const [deleteRowId, setDeleteRowId] = useState(null);
+  const [editText, setEditText] = useState('');
   const theme = useTheme();
 
   const activeUser = state.users.find((u) => u.id === state.activeUserId);
@@ -50,35 +57,34 @@ const TableRows = ({ table }) => {
     setText('');
   };
 
-  const handleEditRow = (row) => {
-    const newText = prompt('Edit text (max 100 characters):', row.text);
-    if (newText && newText.trim() !== row.text) {
-      if (newText.length > 100) {
-        alert('Text must be 100 characters or less.');
-        return;
-      }
-
-      const updatedRow = {
-        ...row,
-        text: newText.trim(),
-        modifiedBy: activeUser ? activeUser.name : row.modifiedBy,
-        modifiedAt: new Date().toISOString(),
-      };
-
-      dispatch({
-        type: 'UPDATE_ROW',
-        payload: { tableId: table.id, row: updatedRow },
-      });
+  const handleEditSave = () => {
+    if (!editText.trim()) return;
+    if (editText.length > 100) {
+      alert('Text must be 100 characters or less.');
+      return;
     }
+
+    const updatedRow = {
+      ...editRow,
+      text: editText.trim(),
+      modifiedBy: activeUser ? activeUser.name : editRow.modifiedBy,
+      modifiedAt: new Date().toISOString(),
+    };
+
+    dispatch({
+      type: 'UPDATE_ROW',
+      payload: { tableId: table.id, row: updatedRow },
+    });
+
+    setEditRow(null);
+    setEditText('');
   };
 
-  const handleDeleteRow = (rowId) => {
-    if (window.confirm('Delete this row?')) {
-      dispatch({ type: 'DELETE_ROW', payload: { tableId: table.id, rowId } });
-    }
+  const handleDeleteConfirm = () => {
+    dispatch({ type: 'DELETE_ROW', payload: { tableId: table.id, rowId: deleteRowId } });
+    setDeleteRowId(null);
   };
 
-  // Загальний стиль для всіх клітинок у темній та світлій темах
   const cellStyle = {
     backgroundColor: theme.palette.mode === 'dark' ? '#121212' : '#fafafa',
     color: theme.palette.mode === 'dark' ? '#e0e0e0' : '#222',
@@ -130,7 +136,10 @@ const TableRows = ({ table }) => {
                     <Button
                       variant="outlined"
                       size="small"
-                      onClick={() => handleEditRow(row)}
+                      onClick={() => {
+                        setEditRow(row);
+                        setEditText(row.text);
+                      }}
                       sx={{ mr: 1 }}
                     >
                       Edit
@@ -139,7 +148,7 @@ const TableRows = ({ table }) => {
                       variant="outlined"
                       size="small"
                       color="error"
-                      onClick={() => handleDeleteRow(row.id)}
+                      onClick={() => setDeleteRowId(row.id)}
                     >
                       Delete
                     </Button>
@@ -150,6 +159,41 @@ const TableRows = ({ table }) => {
           </Table>
         </TableContainer>
       )}
+
+      {/* Edit Modal */}
+      <Dialog open={!!editRow} onClose={() => setEditRow(null)} maxWidth="sm" fullWidth>
+        <DialogTitle>Edit Row</DialogTitle>
+        <DialogContent>
+          <TextField
+            autoFocus
+            label="New Text"
+            fullWidth
+            value={editText}
+            onChange={(e) => setEditText(e.target.value)}
+            sx={{ mt: 2 }}
+          />
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setEditRow(null)}>Cancel</Button>
+          <Button onClick={handleEditSave} variant="contained">
+            Save
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Delete Confirmation Modal */}
+      <Dialog open={!!deleteRowId} onClose={() => setDeleteRowId(null)}>
+        <DialogTitle>Confirm Delete</DialogTitle>
+        <DialogContent>
+          <Typography>Are you sure you want to delete this row?</Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setDeleteRowId(null)}>Cancel</Button>
+          <Button onClick={handleDeleteConfirm} color="error" variant="contained">
+            Delete
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 };
