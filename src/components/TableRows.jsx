@@ -20,6 +20,10 @@ import {
   InputLabel,
   FormControl,
   TableSortLabel,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
 } from '@mui/material';
 
 import { useSnackbar } from 'notistack';
@@ -30,8 +34,9 @@ const TableRows = ({ table }) => {
   const [filterText, setFilterText] = useState('');
   const [filterUser, setFilterUser] = useState('');
   const [sortConfig, setSortConfig] = useState({ key: 'createdAt', direction: 'desc' });
-  const theme = useTheme();
+  const [openAddModal, setOpenAddModal] = useState(false);
 
+  const theme = useTheme();
   const { enqueueSnackbar } = useSnackbar();
 
   const activeUser = state.users.find((u) => u.id === state.activeUserId);
@@ -61,6 +66,7 @@ const TableRows = ({ table }) => {
 
     dispatch({ type: 'ADD_ROW', payload: { tableId: table.id, row: newRow } });
     setText('');
+    setOpenAddModal(false);
     enqueueSnackbar('Row added successfully.', { variant: 'success' });
   };
 
@@ -85,7 +91,6 @@ const TableRows = ({ table }) => {
   };
 
   const handleDeleteRow = (rowId) => {
-    // Просте підтвердження через window.confirm, але з нотифікацією замість alert
     if (window.confirm('Delete this row?')) {
       dispatch({ type: 'DELETE_ROW', payload: { tableId: table.id, rowId } });
       enqueueSnackbar('Row deleted.', { variant: 'warning' });
@@ -131,40 +136,32 @@ const TableRows = ({ table }) => {
         Rows
       </Typography>
 
-      <Box display="flex" gap={2} alignItems="center" mb={2} flexWrap="wrap">
-        <TextField
-          label="Row text (max 100 chars)"
-          value={text}
-          onChange={(e) => setText(e.target.value)}
-          size="small"
-          sx={{ flexGrow: 1, minWidth: '200px' }}
-        />
-        <Button variant="contained" onClick={handleAddRow}>
+      <Box display="flex" justifyContent="space-between" mb={2} flexWrap="wrap" gap={2}>
+        <Box display="flex" gap={2} alignItems="center">
+          <TextField
+            label="Search text"
+            value={filterText}
+            onChange={(e) => setFilterText(e.target.value)}
+            size="small"
+          />
+          <FormControl size="small" sx={{ minWidth: 180 }}>
+            <InputLabel>Filter by User</InputLabel>
+            <Select
+              value={filterUser}
+              onChange={(e) => setFilterUser(e.target.value)}
+              label="Filter by User"
+            >
+              <MenuItem value="">All</MenuItem>
+              {Array.from(new Set(table.rows.map((r) => r.createdBy))).map((user) => (
+                <MenuItem key={user} value={user}>{user}</MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+        </Box>
+
+        <Button variant="contained" onClick={() => setOpenAddModal(true)}>
           + Add Row
         </Button>
-      </Box>
-
-      <Box display="flex" gap={2} alignItems="center" mb={2} flexWrap="wrap">
-        <TextField
-          label="Search text"
-          value={filterText}
-          onChange={(e) => setFilterText(e.target.value)}
-          size="small"
-          sx={{ minWidth: 200 }}
-        />
-        <FormControl size="small" sx={{ minWidth: 200 }}>
-          <InputLabel>Filter by User</InputLabel>
-          <Select
-            value={filterUser}
-            onChange={(e) => setFilterUser(e.target.value)}
-            label="Filter by User"
-          >
-            <MenuItem value="">All</MenuItem>
-            {Array.from(new Set(table.rows.map((r) => r.createdBy))).map((user) => (
-              <MenuItem key={user} value={user}>{user}</MenuItem>
-            ))}
-          </Select>
-        </FormControl>
       </Box>
 
       {filteredAndSortedRows.length === 0 ? (
@@ -226,6 +223,26 @@ const TableRows = ({ table }) => {
           </Table>
         </TableContainer>
       )}
+
+      {/* Add Row Modal */}
+      <Dialog open={openAddModal} onClose={() => setOpenAddModal(false)} maxWidth="sm" fullWidth>
+        <DialogTitle>Add New Row</DialogTitle>
+        <DialogContent>
+          <TextField
+            autoFocus
+            label="Row text (max 100 characters)"
+            fullWidth
+            value={text}
+            onChange={(e) => setText(e.target.value)}
+            inputProps={{ maxLength: 100 }}
+            sx={{ mt: 1 }}
+          />
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setOpenAddModal(false)}>Cancel</Button>
+          <Button onClick={handleAddRow} variant="contained">Add</Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 };
