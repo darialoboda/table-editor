@@ -115,10 +115,10 @@ const UserManager = () => {
     enqueueSnackbar('Active user changed.', { variant: 'default' });
   };
 
-  // Знаходимо активного користувача за id
+  
   const activeUser = state.users.find(user => user.id === state.activeUserId);
 
-  // Легкий прозорий фон банера під теми
+  
   const bannerBgColor =
     theme.palette.mode === 'dark'
       ? 'rgba(255, 255, 255, 0.12)'
@@ -128,7 +128,7 @@ const UserManager = () => {
 
   return (
     <Box sx={{ mb: 5 }}>
-      {/* Банер активного користувача */}
+     
       {activeUser && (
         <Box
           sx={{
