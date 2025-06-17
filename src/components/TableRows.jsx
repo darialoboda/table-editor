@@ -35,6 +35,9 @@ const TableRows = ({ table }) => {
   const [filterUser, setFilterUser] = useState('');
   const [sortConfig, setSortConfig] = useState({ key: 'createdAt', direction: 'desc' });
   const [openAddModal, setOpenAddModal] = useState(false);
+  const [editRow, setEditRow] = useState(null);
+  const [editText, setEditText] = useState('');
+  const [deleteRowId, setDeleteRowId] = useState(null);
 
   const theme = useTheme();
   const { enqueueSnackbar } = useSnackbar();
@@ -68,33 +71,6 @@ const TableRows = ({ table }) => {
     setText('');
     setOpenAddModal(false);
     enqueueSnackbar('Row added successfully.', { variant: 'success' });
-  };
-
-  const handleEditRow = (row) => {
-    const newText = prompt('Edit text (max 100 characters):', row.text);
-    if (newText && newText.trim() !== row.text) {
-      if (newText.length > 100) {
-        enqueueSnackbar('Text must be 100 characters or less.', { variant: 'error' });
-        return;
-      }
-
-      const updatedRow = {
-        ...row,
-        text: newText.trim(),
-        modifiedBy: activeUser ? activeUser.name : row.modifiedBy,
-        modifiedAt: new Date().toISOString(),
-      };
-
-      dispatch({ type: 'UPDATE_ROW', payload: { tableId: table.id, row: updatedRow } });
-      enqueueSnackbar('Row updated successfully.', { variant: 'info' });
-    }
-  };
-
-  const handleDeleteRow = (rowId) => {
-    if (window.confirm('Delete this row?')) {
-      dispatch({ type: 'DELETE_ROW', payload: { tableId: table.id, rowId } });
-      enqueueSnackbar('Row deleted.', { variant: 'warning' });
-    }
   };
 
   const handleSort = (key) => {
@@ -203,7 +179,10 @@ const TableRows = ({ table }) => {
                     <Button
                       variant="outlined"
                       size="small"
-                      onClick={() => handleEditRow(row)}
+                      onClick={() => {
+                        setEditRow(row);
+                        setEditText(row.text);
+                      }}
                       sx={{ mr: 1 }}
                     >
                       Edit
@@ -212,7 +191,7 @@ const TableRows = ({ table }) => {
                       variant="outlined"
                       size="small"
                       color="error"
-                      onClick={() => handleDeleteRow(row.id)}
+                      onClick={() => setDeleteRowId(row.id)}
                     >
                       Delete
                     </Button>
@@ -241,6 +220,73 @@ const TableRows = ({ table }) => {
         <DialogActions>
           <Button onClick={() => setOpenAddModal(false)}>Cancel</Button>
           <Button onClick={handleAddRow} variant="contained">Add</Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Edit Row Modal */}
+      <Dialog open={Boolean(editRow)} onClose={() => setEditRow(null)} maxWidth="sm" fullWidth>
+        <DialogTitle>Edit Row</DialogTitle>
+        <DialogContent>
+          <TextField
+            autoFocus
+            label="Row text (max 100 characters)"
+            fullWidth
+            value={editText}
+            onChange={(e) => setEditText(e.target.value)}
+            inputProps={{ maxLength: 100 }}
+            sx={{ mt: 1 }}
+          />
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setEditRow(null)}>Cancel</Button>
+          <Button
+            onClick={() => {
+              if (!editText.trim()) {
+                enqueueSnackbar('Text is required.', { variant: 'error' });
+                return;
+              }
+              if (editText.length > 100) {
+                enqueueSnackbar('Text must be 100 characters or less.', { variant: 'error' });
+                return;
+              }
+
+              const updatedRow = {
+                ...editRow,
+                text: editText.trim(),
+                modifiedBy: activeUser ? activeUser.name : editRow.modifiedBy,
+                modifiedAt: new Date().toISOString(),
+              };
+
+              dispatch({ type: 'UPDATE_ROW', payload: { tableId: table.id, row: updatedRow } });
+              enqueueSnackbar('Row updated successfully.', { variant: 'info' });
+              setEditRow(null);
+            }}
+            variant="contained"
+          >
+            Save
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Delete Confirmation Modal */}
+      <Dialog open={Boolean(deleteRowId)} onClose={() => setDeleteRowId(null)}>
+        <DialogTitle>Confirm Delete</DialogTitle>
+        <DialogContent>
+          <Typography>Are you sure you want to delete this row?</Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setDeleteRowId(null)}>Cancel</Button>
+          <Button
+            onClick={() => {
+              dispatch({ type: 'DELETE_ROW', payload: { tableId: table.id, rowId: deleteRowId } });
+              enqueueSnackbar('Row deleted.', { variant: 'warning' });
+              setDeleteRowId(null);
+            }}
+            color="error"
+            variant="contained"
+          >
+            Delete
+          </Button>
         </DialogActions>
       </Dialog>
     </Box>
