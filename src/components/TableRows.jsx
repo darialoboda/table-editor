@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useAppState } from '../context/StateContext';
 import { createId } from '../types';
+
 import {
   Box,
   Typography,
@@ -14,33 +15,38 @@ import {
   Paper,
   TableContainer,
   useTheme,
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogActions,
+  Select,
+  MenuItem,
+  InputLabel,
+  FormControl,
+  TableSortLabel,
 } from '@mui/material';
+
+import { useSnackbar } from 'notistack';
 
 const TableRows = ({ table }) => {
   const { state, dispatch } = useAppState();
   const [text, setText] = useState('');
-  const [editRow, setEditRow] = useState(null); // row object
-  const [deleteRowId, setDeleteRowId] = useState(null);
-  const [editText, setEditText] = useState('');
+  const [filterText, setFilterText] = useState('');
+  const [filterUser, setFilterUser] = useState('');
+  const [sortConfig, setSortConfig] = useState({ key: 'createdAt', direction: 'desc' });
   const theme = useTheme();
+
+  const { enqueueSnackbar } = useSnackbar();
 
   const activeUser = state.users.find((u) => u.id === state.activeUserId);
 
   const handleAddRow = () => {
     if (!activeUser) {
-      alert('Please select an active user first.');
+      enqueueSnackbar('Please select an active user first.', { variant: 'warning' });
       return;
     }
     if (!text.trim()) {
-      alert('Text is required.');
+      enqueueSnackbar('Text is required.', { variant: 'error' });
       return;
     }
     if (text.length > 100) {
-      alert('Text must be 100 characters or less.');
+      enqueueSnackbar('Text must be 100 characters or less.', { variant: 'error' });
       return;
     }
 
@@ -55,35 +61,64 @@ const TableRows = ({ table }) => {
 
     dispatch({ type: 'ADD_ROW', payload: { tableId: table.id, row: newRow } });
     setText('');
+    enqueueSnackbar('Row added successfully.', { variant: 'success' });
   };
 
-  const handleEditSave = () => {
-    if (!editText.trim()) return;
-    if (editText.length > 100) {
-      alert('Text must be 100 characters or less.');
-      return;
+  const handleEditRow = (row) => {
+    const newText = prompt('Edit text (max 100 characters):', row.text);
+    if (newText && newText.trim() !== row.text) {
+      if (newText.length > 100) {
+        enqueueSnackbar('Text must be 100 characters or less.', { variant: 'error' });
+        return;
+      }
+
+      const updatedRow = {
+        ...row,
+        text: newText.trim(),
+        modifiedBy: activeUser ? activeUser.name : row.modifiedBy,
+        modifiedAt: new Date().toISOString(),
+      };
+
+      dispatch({ type: 'UPDATE_ROW', payload: { tableId: table.id, row: updatedRow } });
+      enqueueSnackbar('Row updated successfully.', { variant: 'info' });
     }
-
-    const updatedRow = {
-      ...editRow,
-      text: editText.trim(),
-      modifiedBy: activeUser ? activeUser.name : editRow.modifiedBy,
-      modifiedAt: new Date().toISOString(),
-    };
-
-    dispatch({
-      type: 'UPDATE_ROW',
-      payload: { tableId: table.id, row: updatedRow },
-    });
-
-    setEditRow(null);
-    setEditText('');
   };
 
-  const handleDeleteConfirm = () => {
-    dispatch({ type: 'DELETE_ROW', payload: { tableId: table.id, rowId: deleteRowId } });
-    setDeleteRowId(null);
+  const handleDeleteRow = (rowId) => {
+    // Просте підтвердження через window.confirm, але з нотифікацією замість alert
+    if (window.confirm('Delete this row?')) {
+      dispatch({ type: 'DELETE_ROW', payload: { tableId: table.id, rowId } });
+      enqueueSnackbar('Row deleted.', { variant: 'warning' });
+    }
   };
+
+  const handleSort = (key) => {
+    const isAsc = sortConfig.key === key && sortConfig.direction === 'asc';
+    setSortConfig({ key, direction: isAsc ? 'desc' : 'asc' });
+  };
+
+  const filteredAndSortedRows = useMemo(() => {
+    return [...table.rows]
+      .filter((row) => {
+        return (
+          (!filterText || row.text.toLowerCase().includes(filterText.toLowerCase())) &&
+          (!filterUser || row.createdBy === filterUser)
+        );
+      })
+      .sort((a, b) => {
+        const aValue = a[sortConfig.key] || '';
+        const bValue = b[sortConfig.key] || '';
+        if (sortConfig.key.includes('At')) {
+          return sortConfig.direction === 'asc'
+            ? new Date(aValue) - new Date(bValue)
+            : new Date(bValue) - new Date(aValue);
+        } else {
+          return sortConfig.direction === 'asc'
+            ? aValue.localeCompare(bValue)
+            : bValue.localeCompare(aValue);
+        }
+      });
+  }, [table.rows, filterText, filterUser, sortConfig]);
 
   const cellStyle = {
     backgroundColor: theme.palette.mode === 'dark' ? '#121212' : '#fafafa',
@@ -96,36 +131,71 @@ const TableRows = ({ table }) => {
         Rows
       </Typography>
 
-      <Box display="flex" gap={2} alignItems="center" mb={2}>
+      <Box display="flex" gap={2} alignItems="center" mb={2} flexWrap="wrap">
         <TextField
           label="Row text (max 100 chars)"
           value={text}
           onChange={(e) => setText(e.target.value)}
           size="small"
-          fullWidth
+          sx={{ flexGrow: 1, minWidth: '200px' }}
         />
         <Button variant="contained" onClick={handleAddRow}>
           + Add Row
         </Button>
       </Box>
 
-      {table.rows.length === 0 ? (
-        <Typography color="text.secondary">No rows yet.</Typography>
+      <Box display="flex" gap={2} alignItems="center" mb={2} flexWrap="wrap">
+        <TextField
+          label="Search text"
+          value={filterText}
+          onChange={(e) => setFilterText(e.target.value)}
+          size="small"
+          sx={{ minWidth: 200 }}
+        />
+        <FormControl size="small" sx={{ minWidth: 200 }}>
+          <InputLabel>Filter by User</InputLabel>
+          <Select
+            value={filterUser}
+            onChange={(e) => setFilterUser(e.target.value)}
+            label="Filter by User"
+          >
+            <MenuItem value="">All</MenuItem>
+            {Array.from(new Set(table.rows.map((r) => r.createdBy))).map((user) => (
+              <MenuItem key={user} value={user}>{user}</MenuItem>
+            ))}
+          </Select>
+        </FormControl>
+      </Box>
+
+      {filteredAndSortedRows.length === 0 ? (
+        <Typography color="text.secondary">No rows match your filter.</Typography>
       ) : (
         <TableContainer component={Paper} elevation={2}>
           <Table size="small">
             <TableHead>
               <TableRow sx={cellStyle}>
-                <TableCell><strong>Text</strong></TableCell>
-                <TableCell><strong>Created By</strong></TableCell>
-                <TableCell><strong>Created At</strong></TableCell>
-                <TableCell><strong>Modified By</strong></TableCell>
-                <TableCell><strong>Modified At</strong></TableCell>
+                {['text', 'createdBy', 'createdAt', 'modifiedBy', 'modifiedAt'].map((col) => (
+                  <TableCell key={col}>
+                    <TableSortLabel
+                      active={sortConfig.key === col}
+                      direction={sortConfig.direction}
+                      onClick={() => handleSort(col)}
+                    >
+                      <strong>{
+                        col === 'text' ? 'Text'
+                          : col === 'createdBy' ? 'Created By'
+                          : col === 'createdAt' ? 'Created At'
+                          : col === 'modifiedBy' ? 'Modified By'
+                          : 'Modified At'
+                      }</strong>
+                    </TableSortLabel>
+                  </TableCell>
+                ))}
                 <TableCell><strong>Actions</strong></TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
-              {table.rows.map((row) => (
+              {filteredAndSortedRows.map((row) => (
                 <TableRow key={row.id} hover sx={cellStyle}>
                   <TableCell>{row.text}</TableCell>
                   <TableCell>{row.createdBy}</TableCell>
@@ -136,10 +206,7 @@ const TableRows = ({ table }) => {
                     <Button
                       variant="outlined"
                       size="small"
-                      onClick={() => {
-                        setEditRow(row);
-                        setEditText(row.text);
-                      }}
+                      onClick={() => handleEditRow(row)}
                       sx={{ mr: 1 }}
                     >
                       Edit
@@ -148,7 +215,7 @@ const TableRows = ({ table }) => {
                       variant="outlined"
                       size="small"
                       color="error"
-                      onClick={() => setDeleteRowId(row.id)}
+                      onClick={() => handleDeleteRow(row.id)}
                     >
                       Delete
                     </Button>
@@ -159,41 +226,6 @@ const TableRows = ({ table }) => {
           </Table>
         </TableContainer>
       )}
-
-      {/* Edit Modal */}
-      <Dialog open={!!editRow} onClose={() => setEditRow(null)} maxWidth="sm" fullWidth>
-        <DialogTitle>Edit Row</DialogTitle>
-        <DialogContent>
-          <TextField
-            autoFocus
-            label="New Text"
-            fullWidth
-            value={editText}
-            onChange={(e) => setEditText(e.target.value)}
-            sx={{ mt: 2 }}
-          />
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setEditRow(null)}>Cancel</Button>
-          <Button onClick={handleEditSave} variant="contained">
-            Save
-          </Button>
-        </DialogActions>
-      </Dialog>
-
-      {/* Delete Confirmation Modal */}
-      <Dialog open={!!deleteRowId} onClose={() => setDeleteRowId(null)}>
-        <DialogTitle>Confirm Delete</DialogTitle>
-        <DialogContent>
-          <Typography>Are you sure you want to delete this row?</Typography>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setDeleteRowId(null)}>Cancel</Button>
-          <Button onClick={handleDeleteConfirm} color="error" variant="contained">
-            Delete
-          </Button>
-        </DialogActions>
-      </Dialog>
     </Box>
   );
 };

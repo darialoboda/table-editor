@@ -21,6 +21,8 @@ import {
   DialogTitle,
   DialogContent,
   DialogActions,
+  Avatar,
+  useTheme,
 } from '@mui/material';
 
 import DeleteIcon from '@mui/icons-material/Delete';
@@ -32,6 +34,7 @@ import { useSnackbar } from 'notistack';
 const UserManager = () => {
   const { state, dispatch } = useAppState();
   const { enqueueSnackbar } = useSnackbar();
+  const theme = useTheme();
 
   const [openAddModal, setOpenAddModal] = useState(false);
   const [openEditModal, setOpenEditModal] = useState(false);
@@ -112,8 +115,45 @@ const UserManager = () => {
     enqueueSnackbar('Active user changed.', { variant: 'default' });
   };
 
+  // Знаходимо активного користувача за id
+  const activeUser = state.users.find(user => user.id === state.activeUserId);
+
+  // Легкий прозорий фон банера під теми
+  const bannerBgColor =
+    theme.palette.mode === 'dark'
+      ? 'rgba(255, 255, 255, 0.12)'
+      : theme.palette.grey[100];
+
+  const bannerTextColor = theme.palette.text.primary;
+
   return (
     <Box sx={{ mb: 5 }}>
+      {/* Банер активного користувача */}
+      {activeUser && (
+        <Box
+          sx={{
+            bgcolor: bannerBgColor,
+            color: bannerTextColor,
+            p: 1.5,
+            mb: 3,
+            borderRadius: 2,
+            display: 'flex',
+            alignItems: 'center',
+            gap: 1.5,
+            maxWidth: 400,
+            boxShadow: theme.palette.mode === 'dark' ? '0 0 5px rgba(255,255,255,0.1)' : 'none',
+            userSelect: 'none',
+          }}
+        >
+          <Avatar sx={{ bgcolor: theme.palette.secondary.main, width: 40, height: 40 }}>
+            {activeUser.name.charAt(0).toUpperCase()}
+          </Avatar>
+          <Typography variant="subtitle1" sx={{ fontWeight: 'medium' }}>
+            You are logged in as: {activeUser.name} ({activeUser.email})
+          </Typography>
+        </Box>
+      )}
+
       <Typography variant="h5" gutterBottom>
         User Management
       </Typography>
